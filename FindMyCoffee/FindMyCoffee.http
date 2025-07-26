@@ -1,0 +1,6 @@
+@FindMyCoffee_HostAddress = http://localhost:5233
+
+GET {{FindMyCoffee_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
