@@ -2,43 +2,57 @@
 using FindMyCoffee.Data;
 using FindMyCoffee.Data.API;
 using FindMyCoffee.Data.HttpResponses;
+using FindMyCoffee.Data.Interfaces;
 using FindMyCoffee.Dots;
 using FindMyCoffee.Dtos;
 using FindMyCoffee.Models;
 using FindMyCoffee.Services.Calculations;
+using FindMyCoffee.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
-using System;
-using System.Net;
-using System.Net.Http.Json;
+using MoreLinq;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using static System.Runtime.InteropServices.JavaScript.JSType;
-using MoreLinq;
+using System.Threading;
 
-[Route("api/[controller]/[action]")]
+
+
+/*
+ * Central controller for all coffee shop logic.
+ *
+ * Handles:
+ *  - Creating, updating, and deleting coffee shops
+ *  - Searching shops by distance, rating, name, and type
+ *  - Using external geocoding services to resolve addresses
+ *
+ * Includes optional integrations with the Google Places API (currently disabled).
+ */
+
+[Route("api/[controller]")]
 [ApiController]
-
 public class CoffeeShopController : ControllerBase
 {
     //private readonly MockShopRepo _repository = new MockShopRepo();//Acts as a fake coffeeShop finder from a fake database
     private readonly IConfiguration _config;
-    private readonly IFindMyCoffeeRepo _repository;
+    private readonly ICoffeeShopRepository _repository;
     private readonly PullData _pullData;
     private readonly IMapper _mapper;
-    private readonly string key;
+    private readonly string GeoapifyApiKey;
+    private readonly string googleApiKey;
     private readonly FindMyCoffeeContext _context;
 
-    public CoffeeShopController(IFindMyCoffeeRepo repository, IConfiguration config, PullData pullData, IMapper mapper, FindMyCoffeeContext context)
+    public CoffeeShopController(ICoffeeShopRepository repository, IConfiguration config, PullData pullData, IMapper mapper, FindMyCoffeeContext context)
     {
         _context = context;
         _config = config;
         _repository = repository;
         _pullData = pullData;
         _mapper = mapper;
-        key = _config["Settings:GooglePlacesApiKey"];
+        googleApiKey = _config["Settings:GooglePlacesApiKey"];
+        GeoapifyApiKey = _config["Settings:GeoapifyApiKey"];
     }
 
     [HttpGet("GoogleApiShops")]
@@ -60,7 +74,7 @@ public class CoffeeShopController : ControllerBase
         return json;
     }
 
-    [HttpGet]
+    [HttpGet ("GetWebShopInfo")]
     public ActionResult<IEnumerable<CoffeeShopReadDto>> GetWebShopInfo()
     {
         var coffeeShops = _repository.GetWebShopInfo();
@@ -85,7 +99,7 @@ public class CoffeeShopController : ControllerBase
         else return Ok($"Coffee shop named \"{name}\" was found!");
     }
 
-    [HttpGet]
+    [HttpGet("GetShops")]
     public ActionResult<IEnumerable<CoffeeShopReadDto>> GetShops()
     {
         IEnumerable<CoffeeShopEntity> shops = _repository.GetWebShopInfo();
@@ -99,29 +113,6 @@ public class CoffeeShopController : ControllerBase
         return Ok(viewedShops);
     }
 
-    [HttpPost("GoogleData")]
-    public async Task<IActionResult> PostGoogleData()
-    {
-        var results = await _pullData.PullGoogleInfo();
-        if (results == null) { return BadRequest(); }
-
-        await _pullData.StoreInDB(results);
-        return Ok();
-    }
-
-    [HttpPost]
-    public ActionResult<CoffeeShopReadDto> CreateShop(CoffeeShopCreateDto shop)
-    {
-        var coffeeModel = _mapper.Map<CoffeeShopEntity>(shop);
-        _repository.CreateCoffeeShop(coffeeModel);
-        _repository.SaveChanges();
-
-        var coffeeReadDto = _mapper.Map<CoffeeShopReadDto>(coffeeModel);
-
-        return CreatedAtRoute(nameof(GetShopByName), new { Name = coffeeReadDto.Name }, coffeeReadDto);
-        //return Ok(coffeeReadDto);
-    }
-
     //PUT api/CoffeeShop/{id}
     [HttpPut("{id}")]
     public ActionResult UpdateCoffeeShop(int id, CoffeeShopUpdateDto shopUpdateDto)
@@ -133,7 +124,7 @@ public class CoffeeShopController : ControllerBase
 
         _repository.UpdateCoffeeShop(shopModelFromRepo);//Don't do anything, But maybe other implementations will require that.
 
-        _repository.SaveChanges();
+        _repository.AsyncSaveChanges();
 
         return NoContent();
     }
@@ -156,7 +147,7 @@ public class CoffeeShopController : ControllerBase
 
             _repository.UpdateCoffeeShop(shopModelFromRepo);
 
-            _repository.SaveChanges();
+            _repository.AsyncSaveChanges();
 
             return NoContent();
         }
@@ -171,197 +162,112 @@ public class CoffeeShopController : ControllerBase
         {
             _repository.DeleteCoffeeShop(shopModelFromRepo);
 
-            _repository.SaveChanges();
-            return Ok($"Coffee shop \"{shopModelFromRepo.Name}\" got deleted!");
+            _repository.AsyncSaveChanges();
+            return Ok($"Coffee shop \"{shopModelFromRepo.BusinessName}\" got deleted!");
         }
     }
 
 
+    //{
+    //  "lat": 31.899959063130403,
+    //  "lng": 34.997015994105176
+    //}
 
-    [HttpPost("closest")]
-    public async Task<IActionResult> FindCoffeeShops()
+    public class Location
     {
+        public double lat { get; set; }
+        public double lng { get; set; }
+    }
 
-        var body = new
+    [Authorize(Roles = "Business")] // Only allow access to this endpoint if the user is authenticated -> meaning the user have a valid authentication cookie (or JWT token).
+    [HttpPost("CreateShop")]
+    public async Task<ActionResult<CoffeeShopReadDto>> CreateShop(CoffeeShopViewModel coffeeshop)
+    {
+        //The user sends JSON from the frontend -> Checks if everything is valid
+        if (!ModelState.IsValid) return BadRequest(ModelState);
+
+        var coffeeModel = _mapper.Map<CoffeeShopEntity>(coffeeshop);
+
+        var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (string.IsNullOrEmpty(ownerId)) return Unauthorized();
+        coffeeModel.OwnerId = ownerId;
+
+        coffeeModel.Email = "--";
+
+
+        var locationResult = await FindByAddress(coffeeshop.Street,coffeeshop.City, coffeeshop.Country);
+
+        var okResult = locationResult as OkObjectResult;
+        if (okResult is not null && okResult.Value is not null)
         {
-            origins = new[]
-            {
-            new {
-                waypoint = new {
-                    location = new {
-                        latLng = new { latitude = 32.0832358, longitude = 34.78929520000001 }
-                    }
-                }
-            }
-        },
-            destinations = new[]
-       {
-            new {
-                waypoint = new {
-                    placeId = "ChIJswI6zYZLHRURvn2cn5uxmKk"  // <-- example; use your own
-                }
-            }
-            // add more destinations as needed
-        },
-            travelMode = "DRIVE"
-        };
+            // FindByAddress returns: { lat, lng }
+            var json = JsonSerializer.Serialize(okResult.Value);
+            var loc = JsonSerializer.Deserialize<Location>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-        var json = JsonSerializer.Serialize(body);
-        using HttpClient client = new HttpClient();
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix?key={key}"
-        );
+            if (loc is null) return BadRequest("Failed to parse geocoding result.");
 
-        request.Headers.Add("X-Goog-FieldMask",
-        "originIndex,destinationIndex,distanceMeters,duration,status");
-
-        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await client.SendAsync(request);
-
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var result = await response.Content.ReadAsStringAsync();
-
-        if (response.IsSuccessStatusCode)
+            coffeeModel.Latitude = loc.lat;
+            coffeeModel.Longitude = loc.lng;
+        }
+        else if (locationResult is BadRequestObjectResult bad)
         {
-            return Content(result, "application/json"); // or return Ok(JsonDocument.Parse(result));
+            // keep the *real* reason from FindByAddress
+            return BadRequest(bad.Value);
+        }
+        else if (locationResult is ObjectResult obj)
+        {
+            // other status codes (404, 500, etc.)
+            return StatusCode(obj.StatusCode ?? 500, obj.Value);
         }
         else
         {
-            return StatusCode((int)response.StatusCode, result);
-
+            return StatusCode(500, "Unexpected geocoding error.");
         }
 
+        _repository.CreateCoffeeShop(coffeeModel);
+        await _repository.AsyncSaveChanges();
+        var coffeeReadDto = _mapper.Map<CoffeeShopReadDto>(coffeeModel);
 
 
+        return Created("/api/CoffeeShop", coffeeReadDto);
     }
 
 
-    [HttpGet("FindByAddress")]
-    public async Task<IActionResult> FindByAddress(string streetName, string apartmentNumber, string cityName, string state)
+
+
+
+
+    //GeoapifyResponse → Features → Geometry → Coordinates
+    public class GeoapifyResponse { public List<GeoapifyFeature> Features { get; set; } } 
+    public class GeoapifyFeature { public GeoapifyGeometry Geometry { get; set; } } 
+    public class GeoapifyGeometry { public List<double> Coordinates { get; set; } } // [lon, lat]
+
+    [HttpGet]
+    public async Task<IActionResult> FindByAddress(string streetName, string cityName, string country)
     {
+        var query = $"{streetName}, {cityName}, {country}";
+        //var query = $"{streetName}, {cityName}, {state}";
 
-        string apiKey = key;
+        using var client = new HttpClient { BaseAddress = new Uri("https://api.geoapify.com/") };
+        var url = $"v1/geocode/search?text={Uri.EscapeDataString(query)}&limit=1&lang=en&apiKey={GeoapifyApiKey}";
 
-        using (HttpClient client = new HttpClient())
-        {
+        var resp = await client.GetAsync(url);
+        var body = await resp.Content.ReadAsStringAsync();
 
-            client.BaseAddress = new Uri("https://maps.googleapis.com/");
+        if (!resp.IsSuccessStatusCode)
+            return StatusCode((int)resp.StatusCode, new { message = "Geocoding call failed", upstream = body });
 
-            var address = $"{streetName} {apartmentNumber}, {cityName}, {state}";
-            var encoded = Uri.EscapeDataString(address);
-            string endPoint = $"maps/api/geocode/json?" +
-                $"address={encoded}" +
-                $"&key={apiKey}";
+        var data = JsonSerializer.Deserialize<GeoapifyResponse>(body,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            //string endPoint = $"maps/api/geocode/json?" +
-            //    $"address=Jerusalem Forest st 10,+Modiin,+Israel" +
-            //    $"&key={apiKey}";
-            var response = await client.GetAsync(endPoint);
+        var coords = data?.Features?.FirstOrDefault()?.Geometry?.Coordinates;
+        if (coords != null && coords.Count >= 2)
+            return Ok(new { lat = coords[1], lng = coords[0] }); // GeoJSON = [lon, lat]
 
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                Console.WriteLine(json);
-
-                var data = JsonSerializer.Deserialize<GeocodingResponse>(json);
-
-                var first = data?.Results?.FirstOrDefault();
-                var lat = first.Geometry?.Location?.Lat;
-                var lng = first.Geometry?.Location.Lng;
-
-                if (data.Status != "OK")
-                {
-                    return BadRequest(new { message = "Geocoding failed", status = data?.Status });
-                }
-                if (lat == null || lng == null)
-                {
-                    return NotFound("Given location was not found");
-                }
-                else
-                    return Ok(new { lat, lng });
-
-            }
-
-
-            return BadRequest();
-        }
+        return NotFound(new { message = "No results" });
     }
 
-    /*
-     *  Purpose: I will get lat and lng of the user. With HTTP request, I will pull the city where the lat and lng belong to.
-     *  Then I'll find the closest coffee shop in the specific city. (I will use it in order to reduce the amount of searches).
-     */
-    [HttpGet("FindByGeometry")]
-    public async Task<IActionResult> FindByGeometry(double lat, double lng)
-    {
 
-        string apiKey = key;
-
-        using (HttpClient client = new HttpClient())
-        {
-            client.BaseAddress = new Uri("https://maps.googleapis.com");
-
-            var response = await client.GetStringAsync($"/maps/api/geocode/json?latlng={lat}, {lng}&key={apiKey}");
-
-            try
-            {
-                return Ok(response);
-            }
-            catch
-            {
-                return BadRequest("Could not fetch data");
-            }
-        }
-
-    }
-
-    [HttpPost("DistanceCalculationGoogle")]
-    public async Task<IActionResult> DistanceBetweenCoffeeshopsGoogle(bool drive, double lat1, double lng1, double lat2, double lng2)
-    {
-
-        using (HttpClient client = new HttpClient())
-        {
-
-            client.BaseAddress = new Uri("https://maps.googleapis.com");
-
-            string action = drive ? "driving" : "walking";
-
-            try
-            {
-                var url = $"/maps/api/distancematrix/json" +
-                $"?origins={lat1},{lng1}" +
-                $"&destinations={lat2},{lng2}" +
-                $"&mode={action}" +
-                $"&units=metric" +
-                $"&key={key}";
-
-                var http = await client.GetAsync(url);
-
-                var body = await http.Content.ReadAsStringAsync();
-
-                if (!http.IsSuccessStatusCode)
-                    return StatusCode((int)http.StatusCode, new { error = "HTTP error from Google", status = http.StatusCode, body });
-
-                var dto = JsonSerializer.Deserialize<DistanceMatrixResponse>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                return Ok(dto);
-            }
-            catch
-            {
-                return BadRequest("Could not fetch data");
-
-            }
-        }
-
-    }
-
-    /*
-     *  In another method we will iterate over all the coffee shops and apply this method on each of them.
-     *  This will return the distance of the specific coffeeshop from the user's spot given from the frontend.
-     */
     [HttpPost("FindShortestDistanceDB")]
     public async Task<IActionResult> FindShortestDistanceDB(double userLat1, double userLng1)
     {
@@ -371,7 +277,7 @@ public class CoffeeShopController : ControllerBase
         {
             var closest = coffeeshops.OrderBy(shop => Formulas.Haversine(userLat1, userLng1, shop.Latitude, shop.Longitude)).First();
             var distance = (int)Formulas.Haversine(userLat1, userLng1, closest.Latitude, closest.Longitude) + " km";
-            return Ok(new { closest.Name, closest.Vicinity, distance });
+            return Ok(new { closest.BusinessName, closest.Vicinity, distance });
         }
         catch
         {
@@ -392,7 +298,8 @@ public class CoffeeShopController : ControllerBase
         public double UserLat { get; set; }
         public double UserLng { get; set; }
     }
-    [HttpPost]
+
+    [HttpPost("FindClosestCoffeeshops")]
     public async Task<IActionResult> FindClosestCoffeeshops([FromBody] ClosestRequest data)
     {
         Console.WriteLine($"Received from client: Lat={data.UserLat}, Lng={data.UserLng}, Amount={data.Amount}");
@@ -410,7 +317,10 @@ public class CoffeeShopController : ControllerBase
                 .Take(data.Amount)
                 .Select(shop => new
                 {
-                    shop.Name,
+                    shop.BusinessName,
+                    shop.State,
+                    shop.City,
+                    shop.Street,
                     shop.Title,
                     shop.Vicinity,
                     shop.PriceLevel,
@@ -441,7 +351,7 @@ public class CoffeeShopController : ControllerBase
         public double UserLng { get; set; }
         public string DistanceRanage { get; set; }
     }
-    [HttpPost]
+    [HttpPost("FindByRating")]
     public async Task<IActionResult> FindByRating([FromBody] RatingRequest data, int Amount = 10)
     {
         var coffeeshops = await _context.CoffeeShops.AsNoTracking().ToListAsync();
@@ -498,14 +408,17 @@ public class CoffeeShopController : ControllerBase
                 .Take(Amount)
                 .Select(shop => new
                 {
-                    shop.Name,
+                    shop.BusinessName,
+                    shop.State,
+                    shop.City,
+                    shop.Street,
                     shop.Title,
                     shop.Vicinity,
                     shop.PriceLevel,
                     shop.Rating,
                     distanceKm = Math.Round(Formulas.Haversine(data.UserLat, data.UserLng, shop.Latitude, shop.Longitude))
                 })
-                 .Pipe(shop => Console.WriteLine($"{shop.Name}: {shop.distanceKm} km"))
+                 .Pipe(shop => Console.WriteLine($"{shop.BusinessName}: {shop.distanceKm} km"))
                 .ToList();
 
             return Ok(listOfShopsInGivenRate);
@@ -533,11 +446,14 @@ public class CoffeeShopController : ControllerBase
             try
             {
                 var listOfShopsWithGivenName = coffeeshops
-                    .Where(shop => shop.Name.ToUpper() == request.Name.ToUpper())
+                    .Where(shop => shop.BusinessName.ToUpper() == request.Name.ToUpper())
                     .OrderByDescending(shop => Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude))
                     .Select( shop => new
                     {
-                        shop.Name,
+                        shop.BusinessName,
+                        shop.State,
+                        shop.City,
+                        shop.Street,
                         shop.Title,
                         shop.Vicinity,
                         shop.PriceLevel,
@@ -605,7 +521,7 @@ public class CoffeeShopController : ControllerBase
                         rangeMax = 60;
                         break;
                     }
-                default:
+                case "any":
                     {
                         rangeMin = 0;
                         rangeMax = 1000000;
@@ -619,11 +535,16 @@ public class CoffeeShopController : ControllerBase
             try
             {
                 var coffeeshopListWithGivenType = coffeeshops
-                .Where(shop => shop.Type.ToUpper() == request.Type.ToUpper())
+                .Where(shop => shop.Type.ToUpper() == request.Type.ToUpper()
+                && ( Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude) >= rangeMin 
+                && (Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude) <= rangeMax)))
                 .OrderByDescending(shop => Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude))
                 .Select(shop => new
                 {
-                    shop.Name,
+                    shop.BusinessName,
+                    shop.State,
+                    shop.City,
+                    shop.Street,
                     shop.Title,
                     shop.Vicinity,
                     shop.PriceLevel,
@@ -647,5 +568,154 @@ public class CoffeeShopController : ControllerBase
         }
 
     }
+
+
+
+
+
+
+
+
+
+
+    /* -------------------------------------- Google services (Unavailable right now) --------------------------------------*/
+    //[HttpPost("GoogleData")]
+    //public async Task<IActionResult> PostGoogleData()
+    //{
+    //    var results = await _pullData.PullGoogleInfo();
+    //    if (results == null) { return BadRequest(); }
+
+    //    await _pullData.StoreInDB(results);
+    //    return Ok();
+    //}
+    /*
+ *  Purpose: I will get lat and lng of the user. With HTTP request, I will pull the city where the lat and lng belong to.
+ *  Then I'll find the closest coffee shop in the specific city. (I will use it in order to reduce the amount of searches).
+ */
+    //[HttpGet("FindByGeometry")]
+    //public async Task<IActionResult> FindByGeometry(double lat, double lng)
+    //{
+
+    //    using (HttpClient client = new HttpClient())
+    //    {
+    //        client.BaseAddress = new Uri("https://maps.googleapis.com");
+
+    //        var response = await client.GetStringAsync($"/maps/api/geocode/json?latlng={lat}, {lng}&key={apiKey}");
+
+    //        try
+    //        {
+    //            return Ok(response);
+    //        }
+    //        catch
+    //        {
+    //            return BadRequest("Could not fetch data");
+    //        }
+    //    }
+
+    //}
+
+    //[HttpPost("DistanceCalculationGoogle")]
+    //public async Task<IActionResult> DistanceBetweenCoffeeshopsGoogle(bool drive, double lat1, double lng1, double lat2, double lng2)
+    //{
+
+    //    using (HttpClient client = new HttpClient())
+    //    {
+
+    //        client.BaseAddress = new Uri("https://maps.googleapis.com");
+
+    //        string action = drive ? "driving" : "walking";
+
+    //        try
+    //        {
+    //            var url = $"/maps/api/distancematrix/json" +
+    //            $"?origins={lat1},{lng1}" +
+    //            $"&destinations={lat2},{lng2}" +
+    //            $"&mode={action}" +
+    //            $"&units=metric" +
+    //            $"&key={apiKey}";
+
+    //            var http = await client.GetAsync(url);
+
+    //            var body = await http.Content.ReadAsStringAsync();
+
+    //            if (!http.IsSuccessStatusCode)
+    //                return StatusCode((int)http.StatusCode, new { error = "HTTP error from Google", status = http.StatusCode, body });
+
+    //            var dto = JsonSerializer.Deserialize<DistanceMatrixResponse>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+    //            return Ok(dto);
+    //        }
+    //        catch
+    //        {
+    //            return BadRequest("Could not fetch data");
+
+    //        }
+    //    }
+
+    //}
+
+    /*
+     *  In another method we will iterate over all the coffee shops and apply this method on each of them.
+     *  This will return the distance of the specific coffeeshop from the user's spot given from the frontend.
+     */
+
+    //[HttpPost("closest")]
+    //public async Task<IActionResult> FindCoffeeShops()
+    //{
+
+    //    var body = new
+    //    {
+    //        origins = new[]
+    //        {
+    //        new {
+    //            waypoint = new {
+    //                location = new {
+    //                    latLng = new { latitude = 32.0832358, longitude = 34.78929520000001 }
+    //                }
+    //            }
+    //        }
+    //    },
+    //        destinations = new[]
+    //   {
+    //        new {
+    //            waypoint = new {
+    //                placeId = "ChIJswI6zYZLHRURvn2cn5uxmKk"  // <-- example; use your own
+    //            }
+    //        }
+    //        // add more destinations as needed
+    //    },
+    //        travelMode = "DRIVE"
+    //    };
+
+    //    var json = JsonSerializer.Serialize(body);
+    //    using HttpClient client = new HttpClient();
+    //    using var request = new HttpRequestMessage(
+    //        HttpMethod.Post,
+    //        $"https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix?key={apiKey}"
+    //    );
+
+    //    request.Headers.Add("X-Goog-FieldMask",
+    //    "originIndex,destinationIndex,distanceMeters,duration,status");
+
+    //    request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+    //    var response = await client.SendAsync(request);
+
+    //    var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+    //    var result = await response.Content.ReadAsStringAsync();
+
+    //    if (response.IsSuccessStatusCode)
+    //    {
+    //        return Content(result, "application/json"); // or return Ok(JsonDocument.Parse(result));
+    //    }
+    //    else
+    //    {
+    //        return StatusCode((int)response.StatusCode, result);
+
+    //    }
+
+
+
+    //}
 }
-        

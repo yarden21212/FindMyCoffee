@@ -1,70 +1,62 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using FindMyCoffee.Domain.Enums;
+using FindMyCoffee.Models;
+using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
-namespace FindMyCoffee.Models
+public class CoffeeShopEntity
 {
-    public class CoffeeShopEntity
-    {
-        string[] types = {"Concept", "Bakery", "Coffee Truck", "Drive-thru", "Italian" , "French", "Pub" };
+    [Key]
+    public int Id { get; set; }
 
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        [MaxLength(15)]
-        public int Id { get; set; }
+    /* ------------------------ Relationship ------------------------ */
+    [Required]
+    public string OwnerId { get; set; }  // Foreigner key → User.Id -> We need it because first you create a user and then a shop.
 
-        [Required]
-        [MaxLength(70)]
-        public string? Name { get; set; }
+    //public ApplicationUser Owner { get; set; }  // Navigation (optional)
 
-        [Required]
-        [MaxLength(100)]
-        public string? Type { get; set; }
+    /* ------------------------ Shop info ------------------------*/
+    [Required]
+    public string BusinessName { get; set; }
 
-        [MaxLength(250)]
-        public string? Title { get; set; }
+    [Required]
+    public string Email { get; set; }
 
-        public double Rating { get; set; }
+    [Required]
+    public string Type { get; set; }
 
-        public double Latitude { get; set; }//how far north/south
+    [Required]
+    public PriceLevel PriceLevel { get; set; }
 
-        public double Longitude { get; set; }// how far east/west
+    public string State { get; set; }
+    [Required]
+    public string Country { get; set; }
 
-        public bool IsOpen { get; set; }
+    [Required]
+    public string City { get; set; }
 
-        public string? PhotoReference { get; set; }
+    [Required]
+    public string Street { get; set; }
 
-        public string? PhotoAttribute { get; set; }
+    public string? ApartmentNumber { get; set; }
 
-        public string? PhotoUrl { get; set; }
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
 
-        public string? PlaceId { get; set; }
+    public double Rating { get; set; } = 0;
 
-        [Required]
-        public long PriceLevel { get; set; }
+    public int TotalUserRating { get; set; } = 0;
 
-        public int TotalUserRating { get; set; }
+    public bool IsOpen { get; set; } = false;
+    public string? PhotoUrl { get; set; }
 
-        [Required]
-        [MaxLength(100)]
-        public string? Vicinity { get; set; }
+    public string? Title { get; set; }
+    public string? Vicinity { get; set; }
 
-        [Required]
-        public string? Email { get; set; }
+    public ICollection<UserEntity> Users { get; } = [];//The list of users the coffeeshop is in charged of "many to many"
 
-        [Required]
-        public string? OwnerID {  get; set; }
-
-
-
-
-        public string ToString()
-        {
-            string attributes = "";
-            attributes = $"ID: {Id}\nName: {Name}\nType: {Type}\nTitle: {Title}\nRating: {Rating}";
-
-            return attributes;
-        }
-
-    }
-
+    /* ------------------- Google Data -------------------*/
+    //[Index(nameof(PlaceId), IsUnique = true)]
+    public string? PlaceId{ get; set; } = string.Empty;
+    public string PhotoAttribute { get; set; } = string.Empty;
+    public string PhotoReference {  get; set; } = string.Empty;
 }

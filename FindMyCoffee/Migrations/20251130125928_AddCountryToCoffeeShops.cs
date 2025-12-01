@@ -5,23 +5,24 @@
 namespace FindMyCoffee.Migrations
 {
     /// <inheritdoc />
-    public partial class OwnerIdAdded : Migration
+    public partial class AddCountryToCoffeeShops : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "OwnerID",
+                name: "Country",
                 table: "CoffeeShops",
                 type: "text",
-                nullable: true);
+                nullable: false,
+                defaultValue: "");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "OwnerID",
+                name: "Country",
                 table: "CoffeeShops");
         }
     }

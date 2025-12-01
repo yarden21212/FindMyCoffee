@@ -12,27 +12,37 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FindMyCoffee.Migrations
 {
     [DbContext(typeof(FindMyCoffeeContext))]
-    [Migration("20250828113053_StoreEnumsAsText")]
-    partial class StoreEnumsAsText
+    [Migration("20251104122821_UserCoffeeShopsTableForManyToManyRelationship")]
+    partial class UserCoffeeShopsTableForManyToManyRelationship
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.7")
+                .HasAnnotation("ProductVersion", "9.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("FindMyCoffee.Models.CoffeeShopEntity", b =>
+            modelBuilder.Entity("CoffeeShopEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(15)
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApartmentNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -47,19 +57,16 @@ namespace FindMyCoffee.Migrations
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(70)
-                        .HasColumnType("character varying(70)");
-
-                    b.Property<string>("OwnerID")
+                    b.Property<string>("OwnerId")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhotoAttribute")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhotoReference")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhotoUrl")
@@ -68,35 +75,54 @@ namespace FindMyCoffee.Migrations
                     b.Property<string>("PlaceId")
                         .HasColumnType("text");
 
-                    b.Property<long>("PriceLevel")
-                        .HasColumnType("bigint");
+                    b.Property<int>("PriceLevel")
+                        .HasColumnType("integer");
 
                     b.Property<double>("Rating")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Title")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
+                        .HasColumnType("text");
 
                     b.Property<int>("TotalUserRating")
                         .HasColumnType("integer");
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Vicinity")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("PlaceId")
-                        .IsUnique();
+                        .HasFilter("\"PlaceId\" IS NOT NULL");
 
                     b.ToTable("CoffeeShops");
+                });
+
+            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
+                {
+                    b.Property<int>("CoffeeShopsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsersId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CoffeeShopsId", "UsersId");
+
+                    b.HasIndex("UsersId");
+
+                    b.ToTable("UserCoffeeShops", (string)null);
                 });
 
             modelBuilder.Entity("FindMyCoffee.Models.UserEntity", b =>
@@ -106,6 +132,9 @@ namespace FindMyCoffee.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateOnly?>("DOB")
                         .HasColumnType("date");
@@ -128,6 +157,9 @@ namespace FindMyCoffee.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -152,6 +184,21 @@ namespace FindMyCoffee.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
+                {
+                    b.HasOne("CoffeeShopEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CoffeeShopsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FindMyCoffee.Models.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("UsersId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

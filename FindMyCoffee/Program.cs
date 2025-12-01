@@ -1,11 +1,14 @@
 using FindMyCoffee.Data;
 using FindMyCoffee.Data.API;
-using FindMyCoffee.Domain;
+using FindMyCoffee.Data.Interfaces;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Serialization;
+using static System.Net.WebRequestMethods;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Configuration.AddJsonFile("appsettings.json"); // Read your API key
 
 Console.WriteLine(new String('-', 40));
@@ -17,11 +20,10 @@ Console.WriteLine(new String('-', 40));
 
 
 
-builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 //builder.Services.AddScoped<IFindMyCoffeeRepo, MockShopRepo>();
-builder.Services.AddScoped<IFindMyCoffeeRepo, SqlFindMyCoffeeRepo>();
+builder.Services.AddScoped<ICoffeeShopRepository, SqlFindMyCoffeeRepo>();
 builder.Services.AddTransient<GooglePlacesService>();
 builder.Services.AddDbContext<FindMyCoffeeContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("CoffeeDbConnection")));
@@ -38,52 +40,49 @@ builder.Services.AddScoped<IUserUniquenessChecker, UserUniquenessChecker>();
 /* Add HttpClient */
 builder.Services.AddHttpClient();
 
-var app = builder.Build();      
+
+
+//Cookie authentication:
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "auth-cookie"; 
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None;  //During development, the app runs over HTTP and not HTTPS so chrome blocks it. By placing "None" instead of "Always", chrome lets the http call to pass to the frontend.
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(24);
+        //options.Cookie.IsEssential = true;
+    });
+
+
+
+
+
+var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous(); // allow anonymous access to /openapi endpoints
 
     // Enable Swagger UI
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-app.UseAuthorization();
-// Remove or fix the following lines to resolve CS0201 and CS0165 errors:
-
-// IFindMyCoffeeRepo obj;
-// obj.GetWebShopInfo;
-
-// Example fix: Properly instantiate the object and call the method
-// (This is just for demonstration; in a real application, you would get the implementation from DI)
 
 
 
-Console.WriteLine("---------------Delete later---------------");
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
+app.UseHttpsRedirection();  // If anybody tries to access the app from a non-secured port, it will force him to go to the SSL port
 
-    try
-    {
-        var repo = services.GetRequiredService<IFindMyCoffeeRepo>();
-        var webShopInfo = repo.GetWebShopInfo();
-        Console.WriteLine(webShopInfo);
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error: {ex.Message}");
-    }
-}
-Console.WriteLine("---------------Delete later---------------");
 
+
+app.UseRouting();           // Right now not in use
+
+//Cookie authentication
+app.UseAuthentication();    // Turns on the ability to have users log-in and log-out. -> The act it self of login-in\out
+app.UseAuthorization();     // When log-in and log-out, we secure the resources based on who they are. -> What you can do
 app.MapControllers();
+
 app.Run();
-
-
-
-
-

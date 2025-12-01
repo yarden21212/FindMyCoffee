@@ -1,16 +1,27 @@
 ﻿using AutoMapper;
 using FindMyCoffee.Data;
+using FindMyCoffee.Data.Interfaces;
+using FindMyCoffee.Domain;
+using FindMyCoffee.Domain.Enums;
 using FindMyCoffee.Dtos;
 using FindMyCoffee.Models;
-using Microsoft.AspNetCore.Mvc;
 using FindMyCoffee.Services.Security;
-using FindMyCoffee.Domain.Enums;
-using FindMyCoffee.Domain;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 using FindMyCoffee.ViewModels;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
-
+/*
+ * This controller manages user-related operations.
+ *
+ * Responsibilities:
+ *  - Registering new users -> Integrating with the database, adds a new UserEntity to the database.
+ *  - Retrieving existing users by ID
+ *
+ * This controller integrates with the database through the FindMyCoffeeContext
+ * and uses AutoMapper to convert between entities and DTOs.
+ */
 namespace FindMyCoffee.Controllers
 {
     [Route("api/[controller]/[action]")]
@@ -18,49 +29,44 @@ namespace FindMyCoffee.Controllers
 
     public class UserController : Controller
     {
-        private readonly FindMyCoffeeContext _context;
+        private readonly FindMyCoffeeContext _legacyContext;
+        private readonly IUserUniquenessChecker _context;
         private readonly IMapper _mapper;
 
-        public UserController(FindMyCoffeeContext context, IMapper mapper)
+        public UserController(FindMyCoffeeContext legacyContext, IUserUniquenessChecker context, IMapper mapper)
         {
-            _mapper = mapper;
             _context = context;
+            _mapper = mapper;
+            _legacyContext = legacyContext;
         }
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<UserReadDto>> FindUserByID(int id)
         {
-            var user = await _context.Users.FindAsync(id); // async version
-
-            if (user == null)
-                return NotFound();
-
-            return Ok(_mapper.Map<UserReadDto>(user));
-        }
-
-        public sealed record LoginRequest(string UserName, string Password);
-        [HttpPost("loginUser")]
-        public async Task<ActionResult<UserReadDto>> Login([FromBody] LoginRequest req)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserName == req.UserName);
-
-            if (user == null) return Unauthorized("Username or password is wrong.");
-            else
+            //var user = await _context.Users.FindAsync(id); // async version
+            try
             {
-                if (!PasswordHasher.CheckPasswordHash(req.Password, user.PasswordHash))
-                    return Unauthorized("Username or password is wrong.");  // 401
+                var user = _context.FindUserById(id);
 
                 return Ok(_mapper.Map<UserReadDto>(user));
+
             }
+            catch
+            {
+                return NotFound();
+            }
+
         }
+
+       
 
         [HttpPost("RegisterUser")]
         public async Task<ActionResult<UserReadDto>> Register(RegisterViewModel request)
         {
 
-            if (await _context.Users.AnyAsync(user => user.UserName == request.UserName))
+            if (await _legacyContext.Users.AnyAsync(user => user.UserName == request.UserName))
                 return Conflict("User name already exists!");
-            if (await _context.Users.AnyAsync(user => user.Email == request.Email))
+            if (await _legacyContext.Users.AnyAsync(user => user.Email == request.Email))
                 return Conflict("Email already exists!");
 
             UserRequestLogic logic;
@@ -78,18 +84,12 @@ namespace FindMyCoffee.Controllers
             entity.PasswordHash = PasswordHasher.HashPassword(dto.Password);
             entity.Role = Role.User;
 
-            _context.Add(entity);
-            await _context.SaveChangesAsync();
+            _legacyContext.Add(entity);
+            await _legacyContext.SaveChangesAsync();
 
             var read = _mapper.Map<UserReadDto>(entity);
             return CreatedAtAction(nameof(FindUserByID), new { id = read.Id }, read);
         }
-
-        //[Authorize(Roles = "Admin")]
-        //[HttpPost("{id}/role")]
-        //public async Task<ActionResult<RegisterRequestData>> SetRole(int userName, [FromBody] SetRoleDto dto)
-        //{
-        //    //Needs to be implemented one day
-        //}
+        
     }   
 }

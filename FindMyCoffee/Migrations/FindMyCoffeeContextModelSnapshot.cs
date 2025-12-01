@@ -17,19 +17,33 @@ namespace FindMyCoffee.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.7")
+                .HasAnnotation("ProductVersion", "9.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("FindMyCoffee.Models.CoffeeShopEntity", b =>
+            modelBuilder.Entity("CoffeeShopEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(15)
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApartmentNumber")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Country")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -44,19 +58,16 @@ namespace FindMyCoffee.Migrations
                     b.Property<double>("Longitude")
                         .HasColumnType("double precision");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(70)
-                        .HasColumnType("character varying(70)");
-
-                    b.Property<string>("OwnerID")
+                    b.Property<string>("OwnerId")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhotoAttribute")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhotoReference")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PhotoUrl")
@@ -65,35 +76,54 @@ namespace FindMyCoffee.Migrations
                     b.Property<string>("PlaceId")
                         .HasColumnType("text");
 
-                    b.Property<long>("PriceLevel")
-                        .HasColumnType("bigint");
+                    b.Property<int>("PriceLevel")
+                        .HasColumnType("integer");
 
                     b.Property<double>("Rating")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Title")
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)");
+                        .HasColumnType("text");
 
                     b.Property<int>("TotalUserRating")
                         .HasColumnType("integer");
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Vicinity")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("PlaceId")
-                        .IsUnique();
+                        .HasFilter("\"PlaceId\" IS NOT NULL");
 
                     b.ToTable("CoffeeShops");
+                });
+
+            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
+                {
+                    b.Property<int>("CoffeeShopsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsersId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CoffeeShopsId", "UsersId");
+
+                    b.HasIndex("UsersId");
+
+                    b.ToTable("UserCoffeeShops", (string)null);
                 });
 
             modelBuilder.Entity("FindMyCoffee.Models.UserEntity", b =>
@@ -103,6 +133,15 @@ namespace FindMyCoffee.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AcceptBusinessTerms")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BusinessContactEmail")
+                        .HasColumnType("text");
+
+                    b.Property<string>("BusinessPhone")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -124,6 +163,9 @@ namespace FindMyCoffee.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("IsBusiness")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -141,12 +183,6 @@ namespace FindMyCoffee.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bytea");
-
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -161,6 +197,21 @@ namespace FindMyCoffee.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
+                {
+                    b.HasOne("CoffeeShopEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CoffeeShopsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FindMyCoffee.Models.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("UsersId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }
