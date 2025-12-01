@@ -1,7 +1,5 @@
-﻿using FindMyCoffee.Models;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
-using FindMyCoffee.Data.API;
-using Microsoft.EntityFrameworkCore;
 
 namespace FindMyCoffee.Data.API
 {
@@ -80,8 +78,8 @@ namespace FindMyCoffee.Data.API
 
                 CoffeeShopEntity cafe = new CoffeeShopEntity
                 {
-                    Name = item.Name,
-                    PriceLevel = item.PriceLevel,
+                    BusinessName = item.Name,
+                    PriceLevel = (Domain.Enums.PriceLevel)item.PriceLevel,
                     Longitude = item.Geometry.Location.lng,
                     Latitude = item.Geometry.Location.lat,
                     Rating = item.Rating,
@@ -94,7 +92,7 @@ namespace FindMyCoffee.Data.API
                     Title = "N/A",
                     PhotoAttribute = item.Photos[0].HtmlAttributions[0],
                     PhotoReference = item.PhotoReference,
-                    OwnerID = "N/A"
+                    OwnerId = "N/A"
                 };
                 newShops.Add(cafe);
             }

@@ -10,8 +10,12 @@ namespace FindMyCoffee.Models
     public class UserEntity
     {
 
-        [Timestamp]
-        public byte[] RowVersion { get; set; } //I don't understand this fully yet.. I'll leave it this way for now
+        //// Used by EF Core for optimistic concurrency control.
+        //// Automatically updated each time this row changes in the database.
+        //// Helps detect conflicting edits (two users updating the same record at once).
+        //// Not required right now, but useful if update/edit features are added later.
+        //[Timestamp]
+        //public byte[] RowVersion { get; set; } //I don't understand this fully yet.. I'll leave it this way for now
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime ModifiedAtUtc { get; set; } = DateTime.UtcNow;
 
@@ -42,6 +46,18 @@ namespace FindMyCoffee.Models
 
         [Required, MaxLength(100)]
         public string PasswordHash { get; set; } = default!;
+
+        public ICollection<CoffeeShopEntity> CoffeeShops { get; set; } = []; //The list of coffeeshops the user is in charge of "many to many"
+
+        //For business upgrade
+
+        [Phone]
+        public string? BusinessPhone { get; set; }
+
+        [EmailAddress]
+        public string? BusinessContactEmail { get; set; }
+        public bool AcceptBusinessTerms { get; set; } = false;
+        public bool IsBusiness { get; set; } = false;
 
     }
 }

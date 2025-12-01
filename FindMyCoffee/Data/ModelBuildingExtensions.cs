@@ -12,11 +12,10 @@ namespace FindMyCoffee.Data
             var genderToString = new EnumToStringConverter<Gender>();
             var roleToString = new EnumToStringConverter<Role>();
 
-            //No two CoffeeShops can have the same PlaceId
+            //No two CoffeeShops can have the same PlaceId (as long they arrive from google api)
             modelBuilder.Entity<CoffeeShopEntity>()
-                .HasIndex(x => x.PlaceId)//in databases (and therefore EF Core), "index"
-                                         //is a special lookup table that the database creates behind the scenes to make searching faster
-                .IsUnique();
+            .HasIndex(e => e.PlaceId)
+            .HasFilter("\"PlaceId\" IS NOT NULL");  // allows duplicates if null
 
             modelBuilder.Entity<UserEntity>()
                 .Property(entity => entity.Gender)

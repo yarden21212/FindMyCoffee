@@ -1,10 +1,12 @@
-﻿using FindMyCoffee.Models;
+﻿using FindMyCoffee.Dtos;
+using FindMyCoffee.Models;
 
-namespace FindMyCoffee.Data
+namespace FindMyCoffee.Data.Interfaces
 {
-    public interface IFindMyCoffeeRepo
+    public interface ICoffeeShopRepository
     {
-        bool SaveChanges();
+        /* --------------------------------- Shop --------------------------------- */
+        Task<bool> AsyncSaveChanges();
         IEnumerable<CoffeeShopEntity> GetWebShopInfo();
         CoffeeShopEntity GetShopById(int id);
         CoffeeShopEntity? GetShopByName(string name);
@@ -12,5 +14,8 @@ namespace FindMyCoffee.Data
         void UpdateCoffeeShop(CoffeeShopEntity shop);
 
         void DeleteCoffeeShop(CoffeeShopEntity shop);
+
+
+
     }
 }

@@ -3,6 +3,7 @@ using System;
 using FindMyCoffee.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FindMyCoffee.Migrations
 {
     [DbContext(typeof(FindMyCoffeeContext))]
-    partial class FindMyCoffeeContextModelSnapshot : ModelSnapshot
+    [Migration("20251028080422_TookRequiredOffApartment")]
+    partial class TookRequiredOffApartment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -38,10 +41,6 @@ namespace FindMyCoffee.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("City")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Country")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -111,21 +110,6 @@ namespace FindMyCoffee.Migrations
                     b.ToTable("CoffeeShops");
                 });
 
-            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
-                {
-                    b.Property<int>("CoffeeShopsId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UsersId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("CoffeeShopsId", "UsersId");
-
-                    b.HasIndex("UsersId");
-
-                    b.ToTable("UserCoffeeShops", (string)null);
-                });
-
             modelBuilder.Entity("FindMyCoffee.Models.UserEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -133,15 +117,6 @@ namespace FindMyCoffee.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("AcceptBusinessTerms")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("BusinessContactEmail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("BusinessPhone")
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -162,9 +137,6 @@ namespace FindMyCoffee.Migrations
                     b.Property<string>("Gender")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<bool>("IsBusiness")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("LastName")
                         .IsRequired()
@@ -197,21 +169,6 @@ namespace FindMyCoffee.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
-                {
-                    b.HasOne("CoffeeShopEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CoffeeShopsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("FindMyCoffee.Models.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("UsersId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

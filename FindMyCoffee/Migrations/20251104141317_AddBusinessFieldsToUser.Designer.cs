@@ -3,6 +3,7 @@ using System;
 using FindMyCoffee.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FindMyCoffee.Migrations
 {
     [DbContext(typeof(FindMyCoffeeContext))]
-    partial class FindMyCoffeeContextModelSnapshot : ModelSnapshot
+    [Migration("20251104141317_AddBusinessFieldsToUser")]
+    partial class AddBusinessFieldsToUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -38,10 +41,6 @@ namespace FindMyCoffee.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("City")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Country")
                         .IsRequired()
                         .HasColumnType("text");
 

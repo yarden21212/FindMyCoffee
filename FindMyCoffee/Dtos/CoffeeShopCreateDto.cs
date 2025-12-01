@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using FindMyCoffee.Domain.Enums;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FindMyCoffee.Dtos
@@ -7,13 +8,13 @@ namespace FindMyCoffee.Dtos
     {
         [Required]
         [MaxLength(70)]
-        public string? Name { get; set; }
+        public string? BusinessName { get; set; }
 
         [Required]
         public string? Type { get; set; }
 
         [Required]
-        public long? PriceLevel { get; set; }
+        public PriceLevel? PriceLevel { get; set; }
 
         [Required]
         public string? Vicinity { get; set; }

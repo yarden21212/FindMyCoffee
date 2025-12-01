@@ -28,6 +28,12 @@ namespace FindMyCoffee.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Seed(); //A side method to add the constraints
+
+            //Creation of many-to-many relationship:
+            modelBuilder.Entity<UserEntity>()       // We tell the modelBuilder that the "UserEntity" entity
+                .HasMany(x => x.CoffeeShops)  // has many LinkedCoffeeShops
+                .WithMany(x => x.Users)
+                .UsingEntity(j => j.ToTable("UserCoffeeShops")); //CoffeeShopsLinked should be the "join table" or in other words: the table that connects the users and coffeeshops.;
         }
 
         internal object GetShopById(int id)

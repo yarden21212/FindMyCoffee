@@ -1,11 +1,17 @@
-﻿using FindMyCoffee.Models;
+﻿using FindMyCoffee.Data.Interfaces;
+using FindMyCoffee.Models;
 using Microsoft.AspNetCore.Mvc;
+using FindMyCoffee.Domain.Enums;
+using FindMyCoffee.Dtos;
+using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 
 namespace FindMyCoffee.Data
 {
-    public class SqlFindMyCoffeeRepo : IFindMyCoffeeRepo
+    public class SqlFindMyCoffeeRepo : ICoffeeShopRepository
     {
         private readonly FindMyCoffeeContext _context;
+        private readonly IMapper _mapper;
 
         public SqlFindMyCoffeeRepo(FindMyCoffeeContext context)
         {
@@ -27,7 +33,7 @@ namespace FindMyCoffee.Data
         //More methods
         public CoffeeShopEntity GetShopByName(string name)
         {
-            CoffeeShopEntity? shop = _context.CoffeeShops.FirstOrDefault(cafe => cafe.Name == name);
+            CoffeeShopEntity? shop = _context.CoffeeShops.FirstOrDefault(cafe => cafe.BusinessName == name);
 
             if(shop == null) throw new ArgumentException($"Could not find {name}");
             else { return shop; }
@@ -40,9 +46,9 @@ namespace FindMyCoffee.Data
             else { return shop; }
         }
 
-        public bool SaveChanges()
+        public async Task<bool> AsyncSaveChanges()
         {
-            return _context.SaveChanges() >= 0;
+            return await _context.SaveChangesAsync() >= 0;
         }
 
         public void CreateCoffeeShop(CoffeeShopEntity shop)
@@ -68,6 +74,7 @@ namespace FindMyCoffee.Data
             }
         }
          //---------------------------------                   User interface implementation:                   ------------------------------------------// 
+
 
     }
 }
