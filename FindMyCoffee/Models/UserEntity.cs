@@ -47,7 +47,8 @@ namespace FindMyCoffee.Models
         [Required, MaxLength(100)]
         public string PasswordHash { get; set; } = default!;
 
-        public ICollection<CoffeeShopEntity> CoffeeShops { get; set; } = []; //The list of coffeeshops the user is in charge of "many to many"
+        //Link for many-to-many
+        public ICollection<UserCoffeeShopsEntity> UserCoffeeShops { get; set; } = []; // Navigation property for many-to-many
 
         //For business upgrade
 

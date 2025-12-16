@@ -17,11 +17,11 @@ namespace FindMyCoffee.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class BusinessController : Controller
+    public class BusinessController : ControllerBase
     {
-        private readonly IUserUniquenessChecker _context;
+        private readonly IUserManager _context;
 
-        public BusinessController(IUserUniquenessChecker context)
+        public BusinessController(IUserManager context)
         {
             _context = context;
         }

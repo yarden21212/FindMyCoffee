@@ -27,13 +27,13 @@ namespace FindMyCoffee.Controllers
     [Route("api/[controller]/[action]")]
     [ApiController]
 
-    public class UserController : Controller
+    public class UserController : ControllerBase
     {
         private readonly FindMyCoffeeContext _legacyContext;
-        private readonly IUserUniquenessChecker _context;
+        private readonly IUserManager _context;
         private readonly IMapper _mapper;
 
-        public UserController(FindMyCoffeeContext legacyContext, IUserUniquenessChecker context, IMapper mapper)
+        public UserController(FindMyCoffeeContext legacyContext, IUserManager context, IMapper mapper)
         {
             _context = context;
             _mapper = mapper;
@@ -46,7 +46,7 @@ namespace FindMyCoffee.Controllers
             //var user = await _context.Users.FindAsync(id); // async version
             try
             {
-                var user = _context.FindUserById(id);
+                var user = await _context.FindUserById(id);
 
                 return Ok(_mapper.Map<UserReadDto>(user));
 
