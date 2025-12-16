@@ -23,7 +23,7 @@ Console.WriteLine(new String('-', 40));
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 //builder.Services.AddScoped<IFindMyCoffeeRepo, MockShopRepo>();
-builder.Services.AddScoped<ICoffeeShopRepository, SqlFindMyCoffeeRepo>();
+builder.Services.AddScoped<ICoffeeShopRepository, CoffeeShopRepository>();
 builder.Services.AddTransient<GooglePlacesService>();
 builder.Services.AddDbContext<FindMyCoffeeContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("CoffeeDbConnection")));
@@ -36,7 +36,7 @@ builder.Services.AddControllers().AddNewtonsoftJson(s =>
 {
     s.SerializerSettings.ContractResolver = new CamelCasePropertyNamesContractResolver();
 });
-builder.Services.AddScoped<IUserUniquenessChecker, UserUniquenessChecker>();
+builder.Services.AddScoped<IUserManager, UserManager>();
 /* Add HttpClient */
 builder.Services.AddHttpClient();
 

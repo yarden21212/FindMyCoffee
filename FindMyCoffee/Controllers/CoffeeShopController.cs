@@ -7,17 +7,20 @@ using FindMyCoffee.Dots;
 using FindMyCoffee.Dtos;
 using FindMyCoffee.Models;
 using FindMyCoffee.Services.Calculations;
+using FindMyCoffee.Services.Distance;
+using FindMyCoffee.Services.Validation;
 using FindMyCoffee.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoreLinq;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
-
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 /*
@@ -35,14 +38,16 @@ using System.Threading;
 [ApiController]
 public class CoffeeShopController : ControllerBase
 {
-    //private readonly MockShopRepo _repository = new MockShopRepo();//Acts as a fake coffeeShop finder from a fake database
-    private readonly IConfiguration _config;
+    //private readonly MockShopRepo _repository = new MockShopRepo();// Acts as a fake coffeeShop finder from a fake database
     private readonly ICoffeeShopRepository _repository;
+    private readonly IMapper _mapper;               // Mapping from one 
+    private readonly string GeoapifyApiKey;         // API that generates longitude and latitude based on giving address
+    private readonly FindMyCoffeeContext _context;  // Communicates with the database FindMyCoffeeContext inheriting from DbContext
+
+    //For Google API
+    private readonly IConfiguration _config;
     private readonly PullData _pullData;
-    private readonly IMapper _mapper;
-    private readonly string GeoapifyApiKey;
     private readonly string googleApiKey;
-    private readonly FindMyCoffeeContext _context;
 
     public CoffeeShopController(ICoffeeShopRepository repository, IConfiguration config, PullData pullData, IMapper mapper, FindMyCoffeeContext context)
     {
@@ -54,26 +59,8 @@ public class CoffeeShopController : ControllerBase
         googleApiKey = _config["Settings:GooglePlacesApiKey"];
         GeoapifyApiKey = _config["Settings:GeoapifyApiKey"];
     }
-
-    [HttpGet("GoogleApiShops")]
-    public async Task<string> Get()
-    {
-        string apiKey = _config["GoogleApiKey"];
-        string latitude = "32.08";
-        string longitude = "34.78";
-        string radius = "1500";
-        string type = "cafe";
-
-        //If I run this code 3 times (in 3 seconds delay for each run) I can get 60 results instead of 20
-        string url = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={latitude},{longitude}&radius={radius}&type={type}&key={apiKey}";
-
-        using var client = new HttpClient();
-        var response = await client.GetAsync(url);
-        string json = await response.Content.ReadAsStringAsync();
-
-        return json;
-    }
-
+    
+    
     [HttpGet ("GetWebShopInfo")]
     public ActionResult<IEnumerable<CoffeeShopReadDto>> GetWebShopInfo()
     {
@@ -82,6 +69,8 @@ public class CoffeeShopController : ControllerBase
         return Ok(_mapper.Map<IEnumerable<CoffeeShopReadDto>>(coffeeShops));
     }
 
+
+    /* Get a specific coffeeshop by its ID */
     [HttpGet("{id}", Name = "GetShopById")]
     public ActionResult<CoffeeShopReadDto> GetShopById(int id)
     {
@@ -91,6 +80,7 @@ public class CoffeeShopController : ControllerBase
         else return Ok(_mapper.Map<CoffeeShopReadDto>(coffeeShop));
     }
 
+    /* Get a specific coffeeshop by its name */
     [HttpGet("{name}", Name = "GetShopByName")]
     public ActionResult<CoffeeShopReadDto> GetShopByName(string name)
     {
@@ -99,6 +89,7 @@ public class CoffeeShopController : ControllerBase
         else return Ok($"Coffee shop named \"{name}\" was found!");
     }
 
+    /* Get all the shops from the database */
     [HttpGet("GetShops")]
     public ActionResult<IEnumerable<CoffeeShopReadDto>> GetShops()
     {
@@ -129,30 +120,6 @@ public class CoffeeShopController : ControllerBase
         return NoContent();
     }
 
-    [HttpPatch("{id}")]
-    public ActionResult PartialCoffeeShopUpdate(int id, JsonPatchDocument<CoffeeShopUpdateDto> patchDoc)
-    {
-        var shopModelFromRepo = _repository.GetShopById(id);
-        if (shopModelFromRepo == null) { return NotFound(); }
-        else
-        {
-            var shopToPatch = _mapper.Map<CoffeeShopUpdateDto>(shopModelFromRepo);
-            patchDoc.ApplyTo(shopToPatch, ModelState);
-            if (!TryValidateModel(patchDoc))
-            {
-                return ValidationProblem(ModelState);
-            }
-
-            _mapper.Map(shopToPatch, shopModelFromRepo);
-
-            _repository.UpdateCoffeeShop(shopModelFromRepo);
-
-            _repository.AsyncSaveChanges();
-
-            return NoContent();
-        }
-    }
-
     [HttpDelete("{id}")]
     public ActionResult DeleteCoffeeShop(int id)
     {
@@ -166,12 +133,6 @@ public class CoffeeShopController : ControllerBase
             return Ok($"Coffee shop \"{shopModelFromRepo.BusinessName}\" got deleted!");
         }
     }
-
-
-    //{
-    //  "lat": 31.899959063130403,
-    //  "lng": 34.997015994105176
-    //}
 
     public class Location
     {
@@ -188,9 +149,13 @@ public class CoffeeShopController : ControllerBase
 
         var coffeeModel = _mapper.Map<CoffeeShopEntity>(coffeeshop);
 
-        var ownerId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        if (string.IsNullOrEmpty(ownerId)) return Unauthorized();
-        coffeeModel.OwnerId = ownerId;
+        /* Tries to get the user ID from NameIdentifier.
+        Returns the id value like "5", "17" of the user */
+        var ownerIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(ownerIdClaim)) return Unauthorized();
+
+
+        coffeeModel.OwnerId = ownerIdClaim;
 
         coffeeModel.Email = "--";
 
@@ -208,6 +173,8 @@ public class CoffeeShopController : ControllerBase
 
             coffeeModel.Latitude = loc.lat;
             coffeeModel.Longitude = loc.lng;
+
+
         }
         else if (locationResult is BadRequestObjectResult bad)
         {
@@ -226,15 +193,29 @@ public class CoffeeShopController : ControllerBase
 
         _repository.CreateCoffeeShop(coffeeModel);
         await _repository.AsyncSaveChanges();
+
+
+        int userId;
+        //If ownerIdClaim is valid -> then isNumber = true and the value userId gets filled with the value of ownerIdClaim (the user id)
+        bool isNumber = int.TryParse(ownerIdClaim, out userId);
+        if (isNumber == false)
+            return StatusCode(500, "Invalid user id in token.");
+
+        //Creates a link for UserCoffeeShops table with a new row includes the UserId and CoffeeShopId
+        var link = new UserCoffeeShopsEntity
+        {
+            UserId = userId,
+            CoffeeShopId = coffeeModel.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.UserCoffeeShops.Add(link);
+        await _context.SaveChangesAsync();
+
+
         var coffeeReadDto = _mapper.Map<CoffeeShopReadDto>(coffeeModel);
-
-
         return Created("/api/CoffeeShop", coffeeReadDto);
     }
-
-
-
-
 
 
     //GeoapifyResponse → Features → Geometry → Coordinates
@@ -242,36 +223,64 @@ public class CoffeeShopController : ControllerBase
     public class GeoapifyFeature { public GeoapifyGeometry Geometry { get; set; } } 
     public class GeoapifyGeometry { public List<double> Coordinates { get; set; } } // [lon, lat]
 
+    /* 
+     * Find longitude and latitude of a given address.
+     * This is the way a Business user can create a new business with a given location.
+     * Most people don't know longitude and latitude
+     */
     [HttpGet]
-    public async Task<IActionResult> FindByAddress(string streetName, string cityName, string country)
+    public async Task<IActionResult> FindByAddress(string streetName, string cityName, string country, string? state = null)
     {
-        var query = $"{streetName}, {cityName}, {country}";
-        //var query = $"{streetName}, {cityName}, {state}";
+        // Clean inputs (remove extra spaces so we don't send messy data)
+        streetName = streetName?.Trim() ?? "";
+        cityName = cityName?.Trim() ?? "";
+        country = country?.Trim() ?? "";
+        state = state?.Trim();
 
+        // Basic validation to block empty / obviously bad input
+        var validationError = AddressValidation.ValidateAddressInput(streetName, cityName, country, state);
+        if (validationError != null)
+            return BadRequest(new { message = validationError });
+
+        // Build the address query string (state is optional)
+        var query = $"{streetName}, {cityName}";
+        if (!string.IsNullOrWhiteSpace(state))
+            query += $", {state}";
+
+        query += $", {country}";
+
+
+        // Call Geoapify API
         using var client = new HttpClient { BaseAddress = new Uri("https://api.geoapify.com/") };
         var url = $"v1/geocode/search?text={Uri.EscapeDataString(query)}&limit=1&lang=en&apiKey={GeoapifyApiKey}";
 
         var resp = await client.GetAsync(url);
         var body = await resp.Content.ReadAsStringAsync();
 
+        // If Geoapify failed, return the error
         if (!resp.IsSuccessStatusCode)
             return StatusCode((int)resp.StatusCode, new { message = "Geocoding call failed", upstream = body });
 
+        // Parse the response JSON
         var data = JsonSerializer.Deserialize<GeoapifyResponse>(body,
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
+        // Try to extract latitude and longitude from the first result
         var coords = data?.Features?.FirstOrDefault()?.Geometry?.Coordinates;
+
         if (coords != null && coords.Count >= 2)
+            // GeoJSON order is [longitude, latitude]
             return Ok(new { lat = coords[1], lng = coords[0] }); // GeoJSON = [lon, lat]
 
-        return NotFound(new { message = "No results" });
+        // No valid location found
+        return BadRequest(new { message = "No results" });
     }
 
 
     [HttpPost("FindShortestDistanceDB")]
     public async Task<IActionResult> FindShortestDistanceDB(double userLat1, double userLng1)
     {
-        var coffeeshops = _context.CoffeeShops.AsNoTracking().ToList();
+        var coffeeshops = await _context.CoffeeShops.AsNoTracking().ToListAsync();
 
         try
         {
@@ -325,6 +334,8 @@ public class CoffeeShopController : ControllerBase
                     shop.Vicinity,
                     shop.PriceLevel,
                     shop.Rating,
+                    shop.TotalUserRating,
+                    shop.Id,
                     distanceKm = Math.Round(Formulas.Haversine(data.UserLat, data.UserLng, shop.Latitude, shop.Longitude))
                 })
                 .ToList();
@@ -354,51 +365,21 @@ public class CoffeeShopController : ControllerBase
     [HttpPost("FindByRating")]
     public async Task<IActionResult> FindByRating([FromBody] RatingRequest data, int Amount = 10)
     {
+        // Fetch all coffee shops from the database without tracking
         var coffeeshops = await _context.CoffeeShops.AsNoTracking().ToListAsync();
 
         Console.WriteLine($"Received from client: Lat={data.UserLat}, Lng={data.UserLng}, Amount={Amount}");
 
-        int rangeMin = 0;
-        int rangeMax = 0;
+        // Resolve the numeric distance bounds (min/max in kilometers)
+        int rangeMin, rangeMax;
         Console.WriteLine(data.DistanceRanage);
 
-        switch (data.DistanceRanage)
-        {
-            case "closest":
-                {
-                    rangeMin = 0;
-                    rangeMax = 5;
-                    break;
-                }
-            case "close":
-                {
-                    rangeMin = 5;
-                    rangeMax = 10;
-                    break;
-                }
-            case "mid":
-                {
-                    rangeMin = 10;
-                    rangeMax = 30;
-                    break;
-                }
-            case "far":
-                {
-                    rangeMin = 30;
-                    rangeMax = 60;
-                    break;
-                }
-            default:
-                {
-                    rangeMin = 0;
-                    rangeMax = 1000000;
-                    break;
-                }
-        }
-
+        (rangeMin, rangeMax) = DistanceRangeService.GetRange(data.DistanceRanage);
+    
         Console.WriteLine("RangeMin:" + rangeMin);
         Console.WriteLine("RangeMax:" + rangeMax);
 
+        // Filter by type and distance, then sort the results and select the needed data
         try
         {
             var listOfShopsInGivenRate = coffeeshops
@@ -416,6 +397,8 @@ public class CoffeeShopController : ControllerBase
                     shop.Vicinity,
                     shop.PriceLevel,
                     shop.Rating,
+                    shop.TotalUserRating,
+                    shop.Id,
                     distanceKm = Math.Round(Formulas.Haversine(data.UserLat, data.UserLng, shop.Latitude, shop.Longitude))
                 })
                  .Pipe(shop => Console.WriteLine($"{shop.BusinessName}: {shop.distanceKm} km"))
@@ -441,6 +424,7 @@ public class CoffeeShopController : ControllerBase
 
         try
         {
+            // Fetch all coffee shops from the database without tracking
             var coffeeshops = await _context.CoffeeShops.AsNoTracking().ToListAsync();
 
             try
@@ -458,6 +442,8 @@ public class CoffeeShopController : ControllerBase
                         shop.Vicinity,
                         shop.PriceLevel,
                         shop.Rating,
+                        shop.TotalUserRating,
+                        shop.Id,
                         distanceKm = Math.Round(Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude))
                     })
                     .ToList();
@@ -484,54 +470,25 @@ public class CoffeeShopController : ControllerBase
         public string DistanceRanage { get; set; }
 
     }
+
     [HttpPost("GetShopsByType")]
     public async Task<IActionResult> GetShopsByType(TypeRequest request)
     {
         try
         {
+            // Fetch all coffee shops from the database without tracking
             var coffeeshops = await _context.CoffeeShops.AsNoTracking().ToListAsync();
 
-            int rangeMin = 0;
-            int rangeMax = 0;
+            int rangeMin, rangeMax;
             Console.WriteLine(request.DistanceRanage);
 
-            switch (request.DistanceRanage)
-            {
-                case "closest":
-                    {
-                        rangeMin = 0;
-                        rangeMax = 5;
-                        break;
-                    }
-                case "close":
-                    {
-                        rangeMin = 5;
-                        rangeMax = 10;
-                        break;
-                    }
-                case "mid":
-                    {
-                        rangeMin = 10;
-                        rangeMax = 30;
-                        break;
-                    }
-                case "far":
-                    {
-                        rangeMin = 30;
-                        rangeMax = 60;
-                        break;
-                    }
-                case "any":
-                    {
-                        rangeMin = 0;
-                        rangeMax = 1000000;
-                        break;
-                    }
-            }
+            // Resolve the numeric distance bounds (min/max in kilometers)
+            (rangeMin, rangeMax) = DistanceRangeService.GetRange(request.DistanceRanage);
 
             Console.WriteLine("RangeMin:" + rangeMin);
             Console.WriteLine("RangeMax:" + rangeMax);
 
+            // Filter by type and distance, then sort the results and select the needed data
             try
             {
                 var coffeeshopListWithGivenType = coffeeshops
@@ -549,6 +506,8 @@ public class CoffeeShopController : ControllerBase
                     shop.Vicinity,
                     shop.PriceLevel,
                     shop.Rating,
+                    shop.TotalUserRating,
+                    shop.Id,
                     distanceKm = Math.Round(Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude))
                 })
                 .ToList();
@@ -570,7 +529,59 @@ public class CoffeeShopController : ControllerBase
     }
 
 
+    /* 
+     * Rating mechanism.
+     * The current implementation is a temporary one because it doesn't prevent spam or repeated votes by the same user.
+     * Will be fixed on the next version.
+     */
+    public class RateRequest
+    {
+        public int Id { set; get; }
+        public int UserRate { set; get; }
+    }
+    [HttpPost("Rate")]
+    public async Task<IActionResult> RateCoffeeshop([FromBody]RateRequest request)
+    {
+        //Prevents bad input.
+        if (request.UserRate < 1 || request.UserRate > 5)
+            return BadRequest("Rating must be between 1 and 5.");
 
+        var coffeeshop = await _context.CoffeeShops.FirstOrDefaultAsync(s => s.Id == request.Id);
+        if (coffeeshop == null)
+            return NotFound();
+
+        coffeeshop.Rating = Formulas.CalculateNewAverage(coffeeshop.Rating, coffeeshop.TotalUserRating, request.UserRate);
+        coffeeshop.TotalUserRating = Formulas.NewCount(coffeeshop.TotalUserRating);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { coffeeshop.Id, coffeeshop.Rating, coffeeshop.TotalUserRating });
+    }
+
+
+    //[HttpPatch("{id}")]
+    //public ActionResult PartialCoffeeShopUpdate(int id, JsonPatchDocument<CoffeeShopUpdateDto> patchDoc)
+    //{
+    //    var shopModelFromRepo = _repository.GetShopById(id);
+    //    if (shopModelFromRepo == null) { return NotFound(); }
+    //    else
+    //    {
+    //        var shopToPatch = _mapper.Map<CoffeeShopUpdateDto>(shopModelFromRepo);
+    //        patchDoc.ApplyTo(shopToPatch, ModelState);
+    //        if (!TryValidateModel(patchDoc))
+    //        {
+    //            return ValidationProblem(ModelState);
+    //        }
+
+    //        _mapper.Map(shopToPatch, shopModelFromRepo);
+
+    //        _repository.UpdateCoffeeShop(shopModelFromRepo);
+
+    //        _repository.AsyncSaveChanges();
+
+    //        return NoContent();
+    //    }
+    //}
 
 
 
@@ -579,6 +590,25 @@ public class CoffeeShopController : ControllerBase
 
 
     /* -------------------------------------- Google services (Unavailable right now) --------------------------------------*/
+    //[HttpGet("GoogleApiShops")]
+    //public async Task<string> Get()
+    //{
+    //    string apiKey = _config["GoogleApiKey"];
+    //    string latitude = "32.08";
+    //    string longitude = "34.78";
+    //    string radius = "1500";
+    //    string type = "cafe";
+
+    //    //If I run this code 3 times (in 3 seconds delay for each run) I can get 60 results instead of 20
+    //    string url = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={latitude},{longitude}&radius={radius}&type={type}&key={apiKey}";
+
+    //    using var client = new HttpClient();
+    //    var response = await client.GetAsync(url);
+    //    string json = await response.Content.ReadAsStringAsync();
+
+    //    return json;
+    //}
+
     //[HttpPost("GoogleData")]
     //public async Task<IActionResult> PostGoogleData()
     //{

@@ -111,19 +111,22 @@ namespace FindMyCoffee.Migrations
                     b.ToTable("CoffeeShops");
                 });
 
-            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
+            modelBuilder.Entity("FindMyCoffee.Models.UserCoffeeShopsEntity", b =>
                 {
-                    b.Property<int>("CoffeeShopsId")
+                    b.Property<int>("UserId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("UsersId")
+                    b.Property<int>("CoffeeShopId")
                         .HasColumnType("integer");
 
-                    b.HasKey("CoffeeShopsId", "UsersId");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.HasIndex("UsersId");
+                    b.HasKey("UserId", "CoffeeShopId");
 
-                    b.ToTable("UserCoffeeShops", (string)null);
+                    b.HasIndex("CoffeeShopId");
+
+                    b.ToTable("UserCoffeeShops");
                 });
 
             modelBuilder.Entity("FindMyCoffee.Models.UserEntity", b =>
@@ -199,19 +202,33 @@ namespace FindMyCoffee.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("CoffeeShopEntityUserEntity", b =>
+            modelBuilder.Entity("FindMyCoffee.Models.UserCoffeeShopsEntity", b =>
                 {
-                    b.HasOne("CoffeeShopEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CoffeeShopsId")
+                    b.HasOne("CoffeeShopEntity", "CoffeeShop")
+                        .WithMany("UserCoffeeShops")
+                        .HasForeignKey("CoffeeShopId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("FindMyCoffee.Models.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("UsersId")
+                    b.HasOne("FindMyCoffee.Models.UserEntity", "User")
+                        .WithMany("UserCoffeeShops")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CoffeeShop");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("CoffeeShopEntity", b =>
+                {
+                    b.Navigation("UserCoffeeShops");
+                });
+
+            modelBuilder.Entity("FindMyCoffee.Models.UserEntity", b =>
+                {
+                    b.Navigation("UserCoffeeShops");
                 });
 #pragma warning restore 612, 618
         }

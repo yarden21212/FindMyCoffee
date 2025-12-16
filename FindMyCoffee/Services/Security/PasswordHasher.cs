@@ -25,11 +25,6 @@ namespace FindMyCoffee.Services.Security
         {
             return BCrypt.Net.BCrypt.Verify(rawPassword, passwordHash);
         }
-
-        internal static bool CheckPasswordHash((string password, string PasswordHash) value)
-        {
-            throw new NotImplementedException();
-        }
     }
 
 }

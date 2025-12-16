@@ -27,9 +27,9 @@ namespace FindMyCoffee.Controllers;
 [Route("/api/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly IUserUniquenessChecker _context;
+    private readonly IUserManager _context;
 
-    public AuthController(IUserUniquenessChecker context)
+    public AuthController(IUserManager context)
     {
         _context = context;
     }
@@ -99,7 +99,7 @@ public class AuthController : ControllerBase
     [HttpGet("getUsername")]
     // This endpoint just returns the username of the logged-in user.
     // It is protected by the [Authorize] attribute, which means that only logged-in users can access it.
-    public ActionResult<LoginResponse> Get()
+    public ActionResult<LoginResponse> GetUsername()
     {
         var username = User.FindFirstValue(ClaimTypes.Name);
 

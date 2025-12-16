@@ -10,7 +10,7 @@ public class CoffeeShopEntity
 
     /* ------------------------ Relationship ------------------------ */
     [Required]
-    public string OwnerId { get; set; }  // Foreigner key → User.Id -> We need it because first you create a user and then a shop.
+    public string OwnerId { get; set; }  // Foreigner key: User.Id -> We need it for creating a shop (needs to check which user is logged in)
 
     //public ApplicationUser Owner { get; set; }  // Navigation (optional)
 
@@ -52,7 +52,8 @@ public class CoffeeShopEntity
     public string? Title { get; set; }
     public string? Vicinity { get; set; }
 
-    public ICollection<UserEntity> Users { get; } = [];//The list of users the coffeeshop is in charged of "many to many"
+    //Link for many-to-many
+    public ICollection<UserCoffeeShopsEntity> UserCoffeeShops { get; set; } = []; // Navigation property for many-to-many
 
     /* ------------------- Google Data -------------------*/
     //[Index(nameof(PlaceId), IsUnique = true)]

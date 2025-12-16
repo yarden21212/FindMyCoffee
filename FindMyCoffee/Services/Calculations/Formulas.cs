@@ -6,12 +6,17 @@ namespace FindMyCoffee.Services.Calculations
     public class Formulas
     {
         private readonly IConfiguration _config;
-        private string key;
-        public Formulas(IConfiguration configuration) 
+        private string _key;
+
+        /* Constructor that injects configuration settings and loads the Google Places API key 
+            for distance and location-related calculations. */
+        public Formulas(IConfiguration configuration)
         {
             _config = configuration;
-            key = configuration["GooglePlacesApiKey"];
+            _key = configuration["GooglePlacesApiKey"];
         }
+
+        /* Calculates the distance (in kilometers) between two geographic points using the Haversine formula. */
         public static double Haversine(double lat1, double lng1, double lat2, double lng2)
         {
 
@@ -28,9 +33,31 @@ namespace FindMyCoffee.Services.Calculations
             return d;
         }
 
+        /*
+         * Converts an angle from degrees to radians.
+         * Degrees are a way of measuring direction on a circle (e.g., 90°, 45°, 180°).
+         */
         private static double deg2rad(double deg)
         {
             return deg * (Math.PI / 180.0);
+        }
+
+        /*
+         * Rating logic 
+         * This first version does not store individual user ratings, it only supports adding new ratings and updating the average.
+         */
+
+        // Calculates the new rating's average, after a user rated a coffeeshop
+        public static double CalculateNewAverage(double oldAvg, int oldRatingCount, int newUserRate)
+        {
+            decimal val =  decimal.Round(((decimal)(oldAvg * oldRatingCount + newUserRate) / (oldRatingCount + 1)), 2, MidpointRounding.AwayFromZero);
+            return (double)val;
+        }
+
+        // Increase the given coffeeshop rating count by 1 (a new rating was given)
+        public static int NewCount(int oldCount)
+        {
+            return oldCount + 1;
         }
 
 
