@@ -19,6 +19,8 @@ using FindMyCoffee.Controllers;
  *  - The user's database ID (ClaimTypes.NameIdentifier)
  *  - The user's username        (ClaimTypes.Name)
  *  - The user's role            (ClaimTypes.Role) -> This will permit "Business users" to create new coffee shops.
+ *  
+ * This video explains the subject well: https://www.youtube.com/watch?v=SV9Jd2cauxw
  */
 namespace FindMyCoffee.Controllers;
 
@@ -39,7 +41,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
        
-        //Check if a user with the given username exists in the database
+        // Validation: checks if a user with the given username exists in the database
         var validUser = await _context.FindByName(request.Username);
 
         //If doesn't exist -> A wrong Username was given, then alert about it
@@ -49,16 +51,17 @@ public class AuthController : ControllerBase
             return Unauthorized("Error: Invalid username or password.");
         }
 
-        //The Username exists -> Check if the given password and the given Username's password in the database match.
+        //Validation: the username exists -> checks if the given password and the given username's password in the database match.
         var correctPassword = PasswordHasher.CheckPasswordHash(request.Password, validUser.PasswordHash);
 
         if (!correctPassword)
         {
             return Unauthorized("Error: Invalid username or password.");
         }
-        //The passwords match!
+
         else
         {
+            //The passwords match!
 
             // Claims are used to store data about the logged-in user.
             Console.WriteLine("I'm initializing claims variable right now:");
@@ -71,21 +74,21 @@ public class AuthController : ControllerBase
             Console.WriteLine("claims variable:" + claims);
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            Console.WriteLine("identify variable:" + identity);
+            Console.WriteLine("Identity variable:" + identity);
             var principal = new ClaimsPrincipal(identity);
             Console.WriteLine("principle variable:" + principal);
 
             var props = new AuthenticationProperties()
             {
-                IsPersistent = true,
-                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(1),  
+                IsPersistent = true,                             // The cookie remains\survives if the browser is closed.
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(1),   // The cookie remains for 24 hours if wasn't switched 
                 AllowRefresh = true,
                 IssuedUtc = DateTimeOffset.UtcNow,
             };
             Console.WriteLine("props variable:" + props);
 
             Console.WriteLine("Arrived to SignInAsync");
-            // Takes the entire ClaimsPrincipal (your "ID card") -> encrypts and serializes it into a single string -> Then sent to the user's browser inside an HTTP Cookie.
+            // Takes all the info, encrypts it, and sends it to the browser as a cookie.
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 principal, props);
@@ -95,13 +98,13 @@ public class AuthController : ControllerBase
        
     }
 
+    // "Authorized" -> Only logged-in users can use it (only request with valid cookie), otherwise .NET will reject it (before the code will even run)
+    //In other words: If a logged-in user exists (which means a cookie exists) then this HTTP will return the cookie's user name, otherwise, will reject it immediately.
     [Authorize]
     [HttpGet("getUsername")]
-    // This endpoint just returns the username of the logged-in user.
-    // It is protected by the [Authorize] attribute, which means that only logged-in users can access it.
     public ActionResult<LoginResponse> GetUsername()
     {
-        var username = User.FindFirstValue(ClaimTypes.Name);
+        var username = User.FindFirstValue(ClaimTypes.Name); // User is part of "Authentication Middleware", should read about it more. MiddleWare -> seems cookie -> Decrypts it -> Find the user-name
 
 
         if (username == null)

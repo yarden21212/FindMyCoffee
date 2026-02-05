@@ -1,9 +1,15 @@
 ﻿using FindMyCoffee.Domain.Enums;
 using Microsoft.Extensions.Primitives;
 using System;
+using FindMyCoffee.Services.Security;
 
 namespace FindMyCoffee.Domain
 {
+
+    /*
+     * Domain-level validation object responsible for enforcing business rules during user registration.
+     * Ensures that invalid user data cannot enter the system.
+    */
     public class UserRequestLogic
     {
         public string UserName { get; set; }
@@ -20,8 +26,10 @@ namespace FindMyCoffee.Domain
                 throw new ArgumentNullException(nameof(userName) + ": First name must contain at least 1 character");
             if (string.IsNullOrEmpty(lastName))
                 throw new ArgumentNullException(nameof(lastName) + ": Last name must contain at least 1 character");
-            if (!email.Contains('@'))
-                throw new ArgumentException(nameof(email) + ": Email must contain '@', try again");
+            if(!UserInfoChecker.IsEmailValid(email))
+                throw new ArgumentException(nameof(email) + ": Email form is incorrect, maybe '@' is missing? try again");
+            //if (!email.Contains('@'))
+            //    throw new ArgumentException(nameof(email) + ": Email must contain '@', try again");
             if (!Enum.IsDefined(typeof(Gender), gender))
                 throw new ArgumentException(nameof(gender) + ": Gender must be 'Male', 'Female' or 'Other'");
             if(password != ConfirmPassword)

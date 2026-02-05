@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MoreLinq;
+using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -328,6 +329,7 @@ public class CoffeeShopController : ControllerBase
                 {
                     shop.BusinessName,
                     shop.State,
+                    shop.Country,
                     shop.City,
                     shop.Street,
                     shop.Title,
@@ -391,6 +393,7 @@ public class CoffeeShopController : ControllerBase
                 {
                     shop.BusinessName,
                     shop.State,
+                    shop.Country,
                     shop.City,
                     shop.Street,
                     shop.Title,
@@ -429,13 +432,15 @@ public class CoffeeShopController : ControllerBase
 
             try
             {
+                // Checks if the coffee-shop's name given by the user is a substring of an existing coffee-shop's inside the database
                 var listOfShopsWithGivenName = coffeeshops
-                    .Where(shop => shop.BusinessName.ToUpper() == request.Name.ToUpper())
+                    .Where(shop => shop.BusinessName.ToUpper() == request.Name.ToUpper() || shop.BusinessName.ToUpper().Contains(request.Name.ToUpper()))
                     .OrderByDescending(shop => Formulas.Haversine(request.UserLat, request.UserLng, shop.Latitude, shop.Longitude))
                     .Select( shop => new
                     {
                         shop.BusinessName,
                         shop.State,
+                        shop.Country,
                         shop.City,
                         shop.Street,
                         shop.Title,
@@ -500,6 +505,7 @@ public class CoffeeShopController : ControllerBase
                 {
                     shop.BusinessName,
                     shop.State,
+                    shop.Country,
                     shop.City,
                     shop.Street,
                     shop.Title,
