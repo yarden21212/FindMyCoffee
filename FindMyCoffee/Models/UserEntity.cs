@@ -5,17 +5,35 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace FindMyCoffee.Models
 {
+
+    /*
+     * Database entity that represents an application user in the FindMyCoffee system.
+     *
+     * Responsibilities:
+     *   Stores user account data (UserName, Email, PasswordHash) and profile information (DOB, Gender, FirstName, LastName).
+     *   Tracks timestamps (CreatedAtUtc, ModifiedAtUtc) -> Especially for future use.
+     *   Stores authorization role (Role) used for permission checks (e.g., regular user vs. business user vs. future admin user).
+     *
+     * Validation / constraints:
+     *   UserName is unique and restricted to alphanumeric and numeric characters
+     *   Email is unique and validated by EmailAddress attribute.
+     *   FirstName/LastName are limited to letters with optional spaces/hyphens/apostrophes.
+     *
+     * Relationships:
+     *   UserCoffeeShops: many-to-many link to coffee shops via UserCoffeeShopsEntity.
+     *
+     * Business upgrade fields:
+     *   Supports upgrading a user to a business account by storing business contact info and flags
+     *   (BusinessPhone, BusinessContactEmail, AcceptBusinessTerms, IsBusiness).
+     */
+
+
     [Index(nameof(UserName), IsUnique = true)]
     [Index(nameof(Email), IsUnique = true)]
     public class UserEntity
     {
+        
 
-        //// Used by EF Core for optimistic concurrency control.
-        //// Automatically updated each time this row changes in the database.
-        //// Helps detect conflicting edits (two users updating the same record at once).
-        //// Not required right now, but useful if update/edit features are added later.
-        //[Timestamp]
-        //public byte[] RowVersion { get; set; } //I don't understand this fully yet.. I'll leave it this way for now
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime ModifiedAtUtc { get; set; } = DateTime.UtcNow;
 
@@ -57,7 +75,7 @@ namespace FindMyCoffee.Models
 
         [EmailAddress]
         public string? BusinessContactEmail { get; set; }
-        public bool AcceptBusinessTerms { get; set; } = false;
+        public bool AcceptBusinessTerms { get; set; } = false; // For future use
         public bool IsBusiness { get; set; } = false;
 
     }

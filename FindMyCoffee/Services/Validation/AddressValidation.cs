@@ -1,5 +1,10 @@
 ﻿namespace FindMyCoffee.Services.Validation
 {
+
+    /*
+     * Applies a basic validation for address given.
+     * Gives the first layer of validation before the API (Geopify at this moment) takes action.
+     */
     public class AddressValidation
     {
         public static string? ValidateAddressInput(string street, string city, string country, string? state)
