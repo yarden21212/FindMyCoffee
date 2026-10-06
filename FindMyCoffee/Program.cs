@@ -9,8 +9,6 @@ using static System.Net.WebRequestMethods;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("appsettings.json"); // Read your API key
-
 Console.WriteLine(new String('-', 40));
 
 Console.WriteLine("Here");
@@ -56,6 +54,18 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("NetlifyFrontend", policy =>
+    {
+        policy
+            .WithOrigins("https://findmycoffee-app.netlify.app")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 
 
 
@@ -79,6 +89,9 @@ app.UseHttpsRedirection();  // If anybody tries to access the app from a non-sec
 
 
 app.UseRouting();           // Right now not in use
+
+
+app.UseCors("NetlifyFrontend");
 
 //Cookie authentication
 app.UseAuthentication();    // Turns on the ability to have users log-in and log-out. -> The act it self of login-in\out
