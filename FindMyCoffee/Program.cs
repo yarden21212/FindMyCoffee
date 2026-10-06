@@ -46,8 +46,12 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         options.Cookie.Name = "auth-cookie"; 
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.None;  //During development, the app runs over HTTP and not HTTPS so chrome blocks it. By placing "None" instead of "Always", chrome lets the http call to pass to the frontend.
+        options.Cookie.SameSite = builder.Environment.IsDevelopment()
+            ? SameSiteMode.Lax
+            : SameSiteMode.None;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() // During development, the app runs over HTTP and not HTTPS so chrome blocks it. By placing "None" instead of "Always", chrome lets the http call to pass to the frontend.
+            ? CookieSecurePolicy.None
+            : CookieSecurePolicy.Always;  
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromHours(24);
         //options.Cookie.IsEssential = true;
