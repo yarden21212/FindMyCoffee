@@ -39,26 +39,43 @@ Frontend source: [Fronted](https://github.com-web-repo)
 
 
 <h1>Architecture</h1>
-                  User's browser
-                        |
-                        v
-             React + Vite frontend
-                  (Netlify)
-                        |
-                    HTTP / JSON
-                        |
-                        v
-              ASP.NET Core Web API
-                    (Railway)
-                  /           \
-                 v             v
-        Entity Framework     Geoapify API
-             Core            (geocoding)
-                 |
-                 v
-         PostgreSQL database
-               (Railway)
-The frontend communicates with the backend through REST endpoints. The API handles application logic, authentication, validation, database access, and geocoding. PostgreSQL stores user and coffee-shop information.
-Screenshots and demo
-Screenshots and a video walkthrough will be added here.
 
+<strong>FindMyCoffee follows a client-server architecture, separating the frontend presentation layer from the backend application logic.</strong>
+
+Client: Browser → React + Vite frontend (Netlify)
+
+API: React frontend → HTTP/JSON → ASP.NET Core Web API (Railway)
+
+Database: ASP.NET Core → Entity Framework Core → PostgreSQL (Railway)
+
+External service: ASP.NET Core → Geoapify API (Address Geocoding)
+
+The frontend communicates with the backend through RESTful API endpoints.
+
+The backend handles business logic, authentication, role-based authorization, request validation, and database operations using Entity Framework Core.
+
+Coffee-shop information, user accounts, and their relationships are stored in PostgreSQL.
+
+<h1>Screenshots & Videos</h1>
+- Will be added soon - 
+[Screenshots and a video walkthrough]
+
+[Homepage and coffee-shop discovery]
+
+[Search results and filtering]
+
+[User registration and authentication]
+
+[Business registration and coffee-shop creation]
+
+<h1>Deployment</h1>
+
+The application is publicly deployed using:
+
+Frontend: Netlify
+
+Backend: Railway
+
+Database: PostgreSQL hosted on Railway
+
+[Try FindMyCoffee Live](https://github.com-web-repo)
