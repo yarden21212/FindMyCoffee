@@ -78,4 +78,4 @@ Backend: Railway
 
 Database: PostgreSQL hosted on Railway
 
-[Try FindMyCoffee Live](https://github.com-web-repo)
+[Try FindMyCoffee Live](https://findmycoffee-app.netlify.app/)
