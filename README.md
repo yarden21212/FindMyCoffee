@@ -5,21 +5,25 @@
 </h1>
 FindMyCoffee is a full-stack coffee-shop discovery application that helps people find cafés based on location and preferences. It also includes user accounts and a business workflow for adding coffee shops.
 This project was my first full-stack project, I tried to avoid AI in order to learn coding, so if the design doesn't look perfect and if some functionality doesn't work perfectly, then that's the reason!
-<h1>The next project will be <strong >PERFECTO</strong>!</h1>
 
-Try the live application: [🌐](https://findmycoffee-app.netlify.app/)
+<h1 align="center">The next project will be <strong >PERFECTO</strong>!</h1>
+
+<h1 align="center">Try the live application: <a href="[https://netlify.app](https://findmycoffee-app.netlify.app/)">🌐</a></h1>
+
+
 
 This repository contains the ASP.NET Core backend. The React frontend is maintained in a separate repository.
 Frontend source: [Fronted](https://github.com/yarden21212/FindMyCoffee-web-repo)
 
 Features
-- Coffee-shop discovery: Search by name or type, and explore results based on rating and distance.
+- Coffee-shop discovery: Search by name, type, given distance or even by the closest to my location, and explore results based on rating and distance.
 - Location-aware results: Calculate proximity from geographic coordinates using the Haversine formula.
 - Accounts and authentication: Register, log in, and log out using cookie-based authentication and hashed passwords.
 - Business registration: Allow registered users to become business users and create coffee-shop listings.
-- Address geocoding: Convert addresses into latitude/longitude using Geoapify.
+- Address geocoding: Convert addresses into latitude/longitude using Geoapify-API.
 - Coffee-shop management: REST endpoints for reading, creating, updating, and deleting shop records.
-Tech stack
+
+<h3>Tech stack</h3>
 Layer	Technologies
 Frontend (separate repository)	React, Vite, Tailwind CSS
 Backend	C#, ASP.NET Core 9 Web API
@@ -31,7 +35,7 @@ Deployment	Netlify (frontend), Railway (API and PostgreSQL)
 API documentation	Swagger / OpenAPI
 
 
-Architecture
+<h3>Architecture</h3>
                   User's browser
                         |
                         v
